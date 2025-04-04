@@ -4,6 +4,10 @@ import configparser
 import json
 from flask_cors import CORS, cross_origin
 from datetime import datetime, timedelta
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
 
 app = Flask(__name__)
 CORS(app)  # Allow all origins
@@ -166,11 +170,175 @@ def get_predictions():
     return data
 
 
+@app.route('/headtohead', methods=['GET'])
+def get_head_to_head(h2h=None, league=None, season=None):
+    # Use provided arguments or fallback to query parameters
+    h2h = h2h or request.args.get("h2h", "170-157")  # Default team IDs
+    league = league or request.args.get("league", "78")  # Default Premier League
+    season = season or request.args.get("season", "2023")  # Default season
+    yesterday = datetime.now() - timedelta(days=1)
+    # Set up API connection
+    conn = http.client.HTTPSConnection(properties.get('api_host'))
+    endpoint = f"/fixtures/headtohead?h2h={h2h}&league={league}&season={season}"
+
+    # Make API request
+    conn.request("GET", endpoint, headers=headers)
+    res = conn.getresponse()
+    data = res.read().decode('utf-8')
+
+    return data
+
+@app.route('/data', methods=['GET'])
+def get_h2h_data():
+    # Use provided arguments or fallback to query parameters
+     return fetch_and_analyze_headtohead()
+
+
+
+from flask import jsonify
+
+def fetch_and_analyze_headtohead(h2h="170-157", league="78", start_season=2020, end_season=2024):
+
+    data = {}
+
+    data['data'] = '2024-05-12'  # TODO.
+    data['home_team_form'] = '67%'  # TODO.
+    data['home_team_attack'] = '100%'  # TODO.
+    data['home_team_defence'] = '42%'  # TODO.
+    data['home_team_goals_for'] = '13 '  # TODO.
+    data['home_team_goals_for_avg'] = '2.6'  # TODO.
+    data['home_team_goals_against'] = '7 '  # TODO.
+    data['home_team_goals_against_avg'] = '1.4'  # TODO.
+    data['away_team_form'] = '73% '  # TODO.
+    data['away_team_attack'] = '50%'  # TODO.
+    data['away_team_defence'] = '92%'  # TODO.
+    data['away_team_goals_for'] = '6'  # TODO.
+    data['away_team_goals_for_avg'] = '1.2'  # TODO.
+    data['away_team_goals_against'] = '1'  # TODO.
+    data['away_team_goals_against_avg'] = '0.2'  # TODO.
+
+    data['matches'] = []
+    head_to_head_extract(data, end_season, h2h, league, start_season)
+
+    extract_team_stats_goals_gaussian("170", data, 'home_team')
+    extract_team_stats_goals_gaussian("157", data, 'away-team')
+
+    return data
+
+
+def extract_team_stats_goals_gaussian(team_id, data, label):
+    response = get_team_stats(team_id)
+    half_time_scores = []
+    full_time_scores = []
+    fixtures_data = json.loads(response.data)  # Parse JSON response
+    # Extract scores from response
+    for fixture in fixtures_data.get('response', []):
+        if not str(fixture['fixture']['status']['long']).__eq__('Not Started'):
+            halftime_score = fixture['score']['halftime']
+            fulltime_score = fixture['score']['fulltime']
+
+            if halftime_score and fulltime_score:
+                if halftime_score.get('home') is None or halftime_score.get('away') is None:
+                    continue
+                home_halftime = halftime_score['home']
+                away_halftime = halftime_score['away']
+
+                if fulltime_score.get('home') is None or fulltime_score.get('away') is None:
+                    continue
+                home_fulltime = fulltime_score['home']
+                away_fulltime = fulltime_score['away']
+
+                half_time_scores.append(home_halftime + away_halftime)
+                full_time_scores.append(home_fulltime + away_fulltime)
+    data['gaussian_ht_goals_all_' + label] = predict_most_probable_goals(half_time_scores)
+    data['gaussian_ft_goals_all_' + label] = predict_most_probable_goals(full_time_scores)
+
+
+def head_to_head_extract(data, end_season, h2h, league, start_season):
+    half_time_scores = []
+    full_time_scores = []
+    for season in range(end_season, start_season - 1, -1):
+        match = {}
+        response = get_head_to_head(h2h, league, season)
+
+        fixtures_data = json.loads(response)  # Parse JSON response
+        # Extract scores from response
+        for fixture in fixtures_data.get('response', []):
+            if not str(fixture['fixture']['status']['long']).__eq__('Not Started'):
+                match['teams'] = fixture['teams']['home']['name'] + " - " + fixture['teams']['away']['name']
+                match['date'] = fixture['fixture']['date']
+                halftime_score = fixture['score']['halftime']
+                fulltime_score = fixture['score']['fulltime']
+
+                match['ht_score'] = str(halftime_score['home']) + " - " + str(halftime_score['away'])
+                match['ft_score'] = str(fulltime_score['home']) + " - " + str(fulltime_score['away'])
+
+                if halftime_score and fulltime_score:
+                    if halftime_score.get('home') is None or halftime_score.get('away') is None:
+                        continue
+                    home_halftime = halftime_score['home']
+                    away_halftime = halftime_score['away']
+
+                    if fulltime_score.get('home') is None or fulltime_score.get('away') is None:
+                        continue
+                    home_fulltime = fulltime_score['home']
+                    away_fulltime = fulltime_score['away']
+
+                    half_time_scores.append(home_halftime + away_halftime)
+                    full_time_scores.append(home_fulltime + away_fulltime)
+            data['matches'].append(match)
+    data['gaussian_ht_goals_h2h'] = predict_most_probable_goals(half_time_scores)
+    data['gaussian_ft_goals_h2h'] = predict_most_probable_goals(full_time_scores)
+
+
+def predict_most_probable_goals(scores):
+    scores_array = np.array(scores)
+    scores_mean = np.mean(scores_array)
+    return int(round(scores_mean))
+
+
+def analyze_gaussian_distribution(half_time_scores, full_time_scores):
+    half_time_array = np.array(half_time_scores)
+    full_time_array = np.array(full_time_scores)
+
+    half_time_mean = np.mean(half_time_array)
+    half_time_std = np.std(half_time_array)
+
+    full_time_mean = np.mean(full_time_array)
+    full_time_std = np.std(full_time_array)
+
+    x_half_time = np.linspace(min(half_time_array), max(half_time_array), 100)
+    y_half_time = norm.pdf(x_half_time, loc=half_time_mean, scale=half_time_std)
+
+    x_full_time = np.linspace(min(full_time_array), max(full_time_array), 100)
+    y_full_time = norm.pdf(x_full_time, loc=full_time_mean, scale=full_time_std)
+
+    plt.figure(figsize=(12, 6))
+
+    # Half-Time Score Distribution
+    plt.subplot(1, 2, 1)
+    plt.plot(x_half_time, y_half_time, label=f"Mean: {half_time_mean:.2f}, Std Dev: {half_time_std:.2f}")
+    plt.title("Gaussian Distribution of Half-Time Scores")
+    plt.xlabel("Half-Time Score")
+    plt.ylabel("Probability Density")
+    plt.legend()
+
+    # Full-Time Score Distribution
+    plt.subplot(1, 2, 2)
+    plt.plot(x_full_time, y_full_time, label=f"Mean: {full_time_mean:.2f}, Std Dev: {full_time_std:.2f}")
+    plt.title("Gaussian Distribution of Full-Time Scores")
+    plt.xlabel("Full-Time Score")
+    plt.ylabel("Probability Density")
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 @app.route('/team_stats', methods=["GET"]) # statistici legate de goluri/ HT/ FT
 @cross_origin()
-def get_team_stats():
-    team_id = request.args.get("team", "529")  # Default to "529" if not provided
-
+def get_team_stats(team_id: None):
+    team_id = team_id or request.args.get("team", "529")  # Default team IDs
     # Connect to the external API
     conn = http.client.HTTPSConnection(properties.get('api_host'))
     conn.request("GET", "/fixtures?team=" + team_id + "&season=2024", headers=headers)
