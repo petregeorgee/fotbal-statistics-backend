@@ -235,7 +235,7 @@ def fetch_and_analyze_headtohead(fixture_id):
     head_to_head_extract(data, fixtures_data['response'][0]['h2h'])
 
     extract_team_stats_goals_gaussian("170", data, 'home_team')
-    extract_team_stats_goals_gaussian("157", data, 'away-team')
+    extract_team_stats_goals_gaussian("157", data, 'away_team')
 
     return data
 
