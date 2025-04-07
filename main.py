@@ -238,8 +238,10 @@ def fetch_and_analyze_headtohead(fixture_id):
     data['matches'] = []
     head_to_head_extract(data, fixtures_data['response'][0]['h2h'])
 
-    extract_team_stats_goals_gaussian("170", data, 'home_team')
-    extract_team_stats_goals_gaussian("157", data, 'away_team')
+    home_team_id = fixtures_data['response'][0]['teams']['home']['id']
+    away_team_id = fixtures_data['response'][0]['teams']['away']['id']
+    extract_team_stats_goals_gaussian(home_team_id, data, 'home_team')
+    extract_team_stats_goals_gaussian(away_team_id, data, 'away_team')
 
     return data
 
@@ -375,7 +377,7 @@ def get_team_stats():
 def get_team_stats_not_api_endpoint(team_id):
     # Connect to the external API
     conn = http.client.HTTPSConnection(properties.get('api_host'))
-    conn.request("GET", "/fixtures?team=" + team_id + "&season=2024", headers=headers)
+    conn.request("GET", "/fixtures?team=" + str(team_id) + "&season=2024", headers=headers)
     res = conn.getresponse()
     data = res.read()
     data = data.decode('utf-8')
