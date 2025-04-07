@@ -158,9 +158,18 @@ def get_next_fixtures():
 
 
 @app.route('/predictions')
-def get_predictions(fixture_id: None):
-    fixture_id = fixture_id or request.args.get("fixture_id", "1208748")  # Default to "140" if not provided
+def get_predictions():
+    fixture_id = request.args.get("fixture_id", "1208748")  # Default to "140" if not provided
 
+    conn = http.client.HTTPSConnection(properties.get('api_host'))
+    conn.request("GET", "/predictions?fixture=" + fixture_id, headers=headers)
+    res = conn.getresponse()
+    data = res.read()
+    data = data.decode('utf-8')
+    return data
+
+
+def get_predictions_not_api_endpoint(fixture_id):
     conn = http.client.HTTPSConnection(properties.get('api_host'))
     conn.request("GET", "/predictions?fixture=" + fixture_id, headers=headers)
     res = conn.getresponse()
@@ -195,8 +204,7 @@ def get_h2h_data():
 
 
 def fetch_and_analyze_headtohead(fixture_id):
-
-    response = get_predictions(fixture_id)
+    response = get_predictions_not_api_endpoint(fixture_id)
     fixtures_data = json.loads(response)
     league_id = fixtures_data['response'][0]['league']['id']
     home_team_id = fixtures_data['response'][0]['teams']['home']['id']
@@ -233,7 +241,7 @@ def fetch_and_analyze_headtohead(fixture_id):
 
 
 def extract_team_stats_goals_gaussian(team_id, data, label):
-    response = get_team_stats(team_id)
+    response = get_team_stats_not_api_endpoint(team_id)
     half_time_scores = []
     full_time_scores = []
     fixtures_data = json.loads(response.data)  # Parse JSON response
@@ -338,10 +346,29 @@ def analyze_gaussian_distribution(half_time_scores, full_time_scores):
     plt.show()
 
 
-@app.route('/team_stats', methods=["GET"]) # statistici legate de goluri/ HT/ FT
+@app.route('/team_stats', methods=["GET"])
 @cross_origin()
-def get_team_stats(team_id: None):
-    team_id = team_id or request.args.get("team", "529")  # Default team IDs
+def get_team_stats():
+    team_id = request.args.get("team", "529")  # Default team ID is 529
+    # Connect to the external API
+    conn = http.client.HTTPSConnection(properties.get('api_host'))
+    conn.request("GET", "/fixtures?team=" + team_id + "&season=2024", headers=headers)
+    res = conn.getresponse()
+    data = res.read()
+    data = data.decode('utf-8')
+
+    # Parse the JSON response
+    response_json = json.loads(data)
+
+    # Sort the "response" list by the "timestamp" field in descending order
+    if "response" in response_json:
+        response_json["response"].sort(key=lambda x: x["fixture"]["timestamp"], reverse=True)
+
+    # Return the sorted JSON as a string
+    return jsonify(response_json)
+
+
+def get_team_stats_not_api_endpoint(team_id):
     # Connect to the external API
     conn = http.client.HTTPSConnection(properties.get('api_host'))
     conn.request("GET", "/fixtures?team=" + team_id + "&season=2024", headers=headers)
