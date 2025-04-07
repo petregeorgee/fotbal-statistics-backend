@@ -206,16 +206,12 @@ def get_h2h_data():
 def fetch_and_analyze_headtohead(fixture_id):
     response = get_predictions_not_api_endpoint(fixture_id)
     fixtures_data = json.loads(response)
-    league_id = fixtures_data['response'][0]['league']['id']
-    home_team_id = fixtures_data['response'][0]['teams']['home']['id']
-    away_team_id = fixtures_data['response'][0]['teams']['away']['id']
-
-    h2h = str(home_team_id) + '-' + str(away_team_id)
     data = {}
 
     # data['data'] = '2024-05-12'  # TODO.
     data['home_team_name'] = fixtures_data['response'][0]['teams']['home']['name']
     data['home_team_logo'] = fixtures_data['response'][0]['teams']['home']['logo']
+    data['home_team_league_form'] = fixtures_data['response'][0]['teams']['home']['league']['form'][-5:] # get last 5 characters
     data['home_team_form'] = fixtures_data['response'][0]['teams']['home']['last_5']['form']
     data['home_team_attack'] = fixtures_data['response'][0]['teams']['home']['last_5']['att']
     data['home_team_defence'] = fixtures_data['response'][0]['teams']['home']['last_5']['def']
@@ -226,6 +222,7 @@ def fetch_and_analyze_headtohead(fixture_id):
 
     data['away_team_name'] = fixtures_data['response'][0]['teams']['away']['name']
     data['away_team_logo'] = fixtures_data['response'][0]['teams']['away']['logo']
+    data['away_team_league_form'] = fixtures_data['response'][0]['teams']['away']['league']['form'][-5:] # get last 5 characters
     data['away_team_form'] = fixtures_data['response'][0]['teams']['away']['last_5']['form']
     data['away_team_attack'] = fixtures_data['response'][0]['teams']['away']['last_5']['att']
     data['away_team_defence'] = fixtures_data['response'][0]['teams']['away']['last_5']['def']
