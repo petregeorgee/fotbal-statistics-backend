@@ -306,7 +306,15 @@ def head_to_head_extract(data, fixture_data):
 
 
 def predict_most_probable_goals(scores):
-    scores_array = np.array(scores)
+    if not scores:
+        return 0  # or any default value you prefer
+
+    scores_array = np.array(scores, dtype=np.float64)
+    scores_array = scores_array[~np.isnan(scores_array)]  # remove NaNs
+
+    if scores_array.size == 0:
+        return 0  # fallback again if all were NaN
+
     scores_mean = np.mean(scores_array)
     return int(round(scores_mean))
 
