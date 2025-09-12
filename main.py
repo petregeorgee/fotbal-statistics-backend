@@ -363,7 +363,7 @@ def get_team_stats():
     team_id = request.args.get("team", "529")  # Default team ID is 529
     # Connect to the external API
     conn = http.client.HTTPSConnection(properties.get('api_host'))
-    conn.request("GET", "/fixtures?team=" + team_id + "&season=2024", headers=headers)
+    conn.request("GET", f"/fixtures?team={team_id}&season={properties.get('season')}", headers=headers)
     res = conn.getresponse()
     data = res.read()
     data = data.decode('utf-8')
@@ -382,7 +382,7 @@ def get_team_stats():
 def get_team_stats_not_api_endpoint(team_id):
     # Connect to the external API
     conn = http.client.HTTPSConnection(properties.get('api_host'))
-    conn.request("GET", "/fixtures?team=" + str(team_id) + "&season=2024", headers=headers)
+    conn.request("GET", f"/fixtures?team={str(team_id)}&season={properties.get('season')}", headers=headers)
     res = conn.getresponse()
     data = res.read()
     data = data.decode('utf-8')
